@@ -6,42 +6,51 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <stdlib.h>
 #include "/home/wally/SO_aulas/SO/include/tracer.h"
 
 int main(int args, char* argv[]){
     int fifo = open("./obj/fifo", O_WRONLY);
-    int fd[2];
     processo name;
     struct timeval tv;
-    char** arg = &argv[3]; 
-
-    if(pipe(fd) < 0){
-        return 2;
-    }
+    char** arg = &argv[3];
 
     if(strcmp("status",argv[1]) == 0){
-
+        name.processo = 0;
+        write(fifo, &name, sizeof(processo));
+        mkfifo("./obj/status", 0666); 
+        status status_f;
+        char str[100] = {0};
+        int stats = open("./obj/status",O_RDONLY);
+        while(read(stats,&status_f,sizeof(status)) > 0){
+            sprintf(str,"%d %s %ld ms\n", status_f.processo, status_f.programa, status_f.time);
+            write(1,str,strlen(str));
+        }
+        close(stats);
     }
-    else{
+    else if(strcmp("execute",argv[1]) == 0){
         int pid = fork();
         if(pid == -1){
             printf("Fork nao abriu");
             return 2;
         }
         if (pid == 0){
-            close(fd[0]);
             int x = getpid();
-            name.programa = argv[3];
+            strcpy(name.programa,argv[3]);
             name.processo = x;
-            name.timestamp = gettimeofday(&tv,NULL);
-            write(fd[1],&name,sizeof(processo));
+            gettimeofday(&tv,NULL);
+            name.tv = tv;
+            write(fifo,&name,sizeof(processo));
             execvp(argv[3],arg);
         }
         else{
-            close(fd[1]);
-            read(fd[0],&name,sizeof(processo));
+            wait(NULL);
+            name.processo = pid;
+            name.programa[0] = 0;
+            gettimeofday(&tv,NULL);;
+            name.tv = tv;
             write(fifo,&name,sizeof(processo));
-            close(fd[1]);
+            close(fifo);
         }
     }
 }
