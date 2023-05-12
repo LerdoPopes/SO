@@ -81,6 +81,7 @@ int main(int args, char* argv[]){
                     close(fifo_status);
                     _exit(0);
                 }
+                wait(NULL);
             }
             else if(name.processo == -1){
                 status pname;
@@ -101,6 +102,7 @@ int main(int args, char* argv[]){
                     close(fifo_status2);
                     _exit(0);
                 }
+                wait(NULL);
             }
             else if(name.processo == -2){
                 int pid = fork();
@@ -126,6 +128,7 @@ int main(int args, char* argv[]){
                     close(fifo_status2);
                     _exit(0);
                 }
+                wait(NULL);
             }
             else if(name.tv.tv_sec == 0 && name.tv.tv_usec == 0){
                 int fd = 0;
