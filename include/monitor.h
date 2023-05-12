@@ -9,6 +9,6 @@ typedef struct processo{
 
 typedef struct status{
     int processo;
-    char programa[20];
+    char programa[50];
     long time;
 }status;
