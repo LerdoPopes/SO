@@ -29,6 +29,17 @@ void remove_proc(processo* arr_procs, int pid, int size, int fd, int args){
     }
 }
 
+int parse_n_count(char* name,char* comp){
+    int n = 0;
+    char* tok;
+    while((tok = strtok_r(name, " ", &name)) != NULL){
+        if(strcmp(tok,comp) == 0){
+            n++;
+        }
+    }
+    return n;
+}
+
 void write_status(int fifo, processo* arr_procs, int size){
     status name;
     for(int i = 0; i < size; i++){
@@ -51,6 +62,7 @@ int main(int args, char* argv[]){
     };
     mkfifo("./obj/status", 0640);
     mkfifo("./obj/status_time", 0640);
+    mkfifo("./obj/status_command", 0640);
     int fifo = open("./obj/fifo", O_RDWR);
     int size = 20;
     processo* arr_procs = malloc(sizeof(processo)*20);
@@ -70,8 +82,8 @@ int main(int args, char* argv[]){
                     _exit(0);
                 }
             }
-            if(name.processo == -1){
-                status name;
+            else if(name.processo == -1){
+                status pname;
                 int pid = fork();
                 if (pid == 0){
                     long time = 0;
@@ -79,13 +91,38 @@ int main(int args, char* argv[]){
                     int fifo_status = open("./obj/status_time",O_RDONLY);
                     while(read(fifo_status,&x,sizeof(int)) > 0){
                         sprintf(str,"%s/%d",argv[1],x);
-                        int file = open(str,O_WRONLY);
-                        read(file,&name,sizeof(status));
-                        time += name.time;
+                        int file = open(str,O_RDONLY);
+                        read(file,&pname,sizeof(status));
+                        time += pname.time;
                     }
                     close(fifo_status);
-                    int fifo_status2 = open(str,O_WRONLY);
+                    int fifo_status2 = open("./obj/status_time",O_WRONLY);
                     write(fifo_status2,&time,sizeof(long));
+                    close(fifo_status2);
+                    _exit(0);
+                }
+            }
+            else if(name.processo == -2){
+                int pid = fork();
+                if (pid == 0){
+                    int times = 0;
+                    long size = name.tv.tv_sec;
+                    int fifo_status = open("./obj/status_command",O_RDONLY);
+                    int n[size];
+                    int i = 0;
+                    while(read(fifo_status,&(n[i]),sizeof(int)) > 0){
+                        i++;
+                    }
+                    for(int j = 0; j < size; j++){
+                        status namae;
+                        sprintf(str,"%s/%d",argv[1],n[j]);
+                        int file = open(str,O_RDONLY);
+                        read(file,&namae,sizeof(namae));
+                        times += parse_n_count(namae.programa,name.programa);
+                    }
+                    close(fifo_status);
+                    int fifo_status2 = open("./obj/status_command",O_WRONLY);
+                    write(fifo_status2,&times,sizeof(int));
                     close(fifo_status2);
                     _exit(0);
                 }
@@ -102,12 +139,6 @@ int main(int args, char* argv[]){
                 int i;
                 for (i = 0; arr_procs[i].processo != 0 && i < size;i++);
                 arr_procs[i] = name;
-                if(args > 1){
-                    sprintf(str,"%s/%d",argv[1],name.processo);
-                    int fd = open(str,O_CREAT | O_TRUNC | O_WRONLY, 0640);
-                    write(fd,name.programa,strlen(name.programa));
-                    close(fd);
-                }
             }
         }
     }
