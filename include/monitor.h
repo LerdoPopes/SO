@@ -5,6 +5,7 @@ typedef struct processo{
     int processo;
     struct timeval tv;
     char programa[50];
+    char statsp[50];
 } processo;
 
 typedef struct status{

@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <stdlib.h>
-#include "/home/wally/SO_aulas/SO/include/tracer.h"
+#include "../include/tracer.h"
 
 #define FILL_TV1 gettimeofday(&tv1,NULL);\
                 name.tv = tv1
@@ -37,6 +37,7 @@ void send_request_time(int fd, int* pid_g, int size){
     for(int i = 0; i <= size;i++){
         int x = pid_g[i];
         write(fd,&x,sizeof(int));
+        
     }
 }
 
@@ -54,11 +55,11 @@ int main(int args, char* argv[]){
     char** arg;
     if(args > 2){
         arg = parse(argv[3]);
-        name.processo = getpid();
-        char str[40] = {0};
-        sprintf(str,"Running PID %d\n",name.processo);
-        write(1,str,strlen(str));
         if((strcmp("execute",argv[1]) == 0) && (strcmp("-p",argv[2]) == 0)){
+            name.processo = getpid();
+            char str[40] = {0};
+            sprintf(str,"Running PID %d\n",name.processo);
+            write(1,str,strlen(str));
             int n = 0;
             int start, final = 0;
             int current = 1,np = 1;
@@ -113,6 +114,10 @@ int main(int args, char* argv[]){
             }
         }
         else if((strcmp("execute",argv[1]) == 0) && (strcmp("-u",argv[2]) == 0)){
+            name.processo = getpid();
+            char str[40] = {0};
+            sprintf(str,"Running PID %d\n",name.processo);
+            write(1,str,strlen(str));
             FILL_TV1;
             int pid = fork();
             if(pid == -1){
@@ -128,42 +133,18 @@ int main(int args, char* argv[]){
                 wait(NULL);
             }
         }
-        else if(strcmp("status_time",argv[1]) == 0){
+        else if(strcmp("stats_time",argv[1]) == 0){
             long time_t = 0;
             int size = args-2;
             int i = 0;
             INIT_STATUS;
             name.processo = -1;
+            char help[50] = {0};
+            sprintf(help,"./obj/status_time%d",getpid());
+            strcpy(name.statsp,help);
+            mkfifo(name.statsp, 0640);
             SEND_NAME_PROC;
-            int stats = open("./obj/status_time",O_WRONLY);
-            int pid = fork();
-            if(pid == 0){
-                send_request_time(stats,pid_g,size);
-                _exit(0);
-            }
-            close(stats);
-            wait(NULL);
-            int stats2 = open("./obj/status_time",O_RDONLY);
-            if(read(stats2,&time_t,sizeof(long)) > 0){
-                char answer[50] = {0};
-                sprintf(answer,"Total execution time is %ld ms\n",time_t);
-                write(1, answer, strlen(answer));
-                close(stats);
-                return 0;
-            }
-        }
-        else if(strcmp("status_command",argv[1]) == 0){
-            int times = 0;
-            int size = args-3;
-            name.processo = -2;
-            strcpy(name.programa,argv[2]);
-            name.tv.tv_sec = size;
-            int* pid_g = malloc(sizeof(int)* size);\
-            for(int i = 0;i < size; i++){\
-                pid_g[i] = atoi(argv[i+3]);
-            }
-            SEND_NAME_PROC;
-            int stats = open("./obj/status_command",O_WRONLY);
+            int stats = open(name.statsp,O_WRONLY);
             int pid = fork();
             if(pid == 0){
                 send_request_time(stats,pid_g,size-1);
@@ -171,14 +152,83 @@ int main(int args, char* argv[]){
             }
             close(stats);
             wait(NULL);
-            int stats2 = open("./obj/status_command",O_RDONLY);
+            int stats2 = open(name.statsp,O_RDONLY);
+            printf("%d\n",stats2);
+            if(read(stats2,&time_t,sizeof(long)) > 0){
+                char answer[50] = {0};
+                sprintf(answer,"Total execution time is %ld ms\n",time_t);
+                write(1, answer, strlen(answer));
+                close(stats);
+                unlink(name.statsp);
+                return 0;
+            }
+        }
+        else if(strcmp("stats_command",argv[1]) == 0){
+            int times = 0;
+            int size = args-3;
+            name.processo = -2;
+            strcpy(name.programa,argv[2]);
+            name.tv.tv_sec = size;
+            int* pid_g = malloc(sizeof(int)* size);
+            for(int i = 0;i < size; i++){\
+                pid_g[i] = atoi(argv[i+3]);
+            }
+            //name.tv.tv_sec = (long)getpid();
+            char help[50] = {0};
+            sprintf(help,"./obj/status_command%d",getpid());
+            strcpy(name.statsp,help);
+            mkfifo(name.statsp, 0640);
+            SEND_NAME_PROC;
+            int stats = open(name.statsp,O_WRONLY);
+            int pid = fork();
+            if(pid == 0){
+                send_request_time(stats,pid_g,size-1);
+                _exit(0);
+            }
+            close(stats);
+            wait(NULL);
+            int stats2 = open(name.statsp,O_RDONLY);
             if(read(stats2,&times,sizeof(int)) > 0){
                 char answer[50] = {0};
                 sprintf(answer,"%s was executed %d times\n",argv[2],times);
                 write(1, answer, strlen(answer));
                 close(stats);
+                unlink(name.statsp);
                 return 0;
             }
+        }
+        else if(strcmp("stats_uniq",argv[1]) == 0){
+            int size = args-2;
+            int i = 0;
+            INIT_STATUS;
+            name.processo = -3;
+            name.tv.tv_sec = (long)getpid();
+            char help[50] = {0};
+            sprintf(help,"./obj/status_uniq%d",getpid());
+            strcpy(name.statsp,help);
+            mkfifo(name.statsp, 0640);
+            SEND_NAME_PROC;
+            int stats = open(name.statsp,O_WRONLY);
+            int pid = fork();
+            if(pid == 0){
+                send_request_time(stats,pid_g,size-1);
+                _exit(0);
+            }
+            close(stats);
+            wait(NULL);
+            int stats2 = open(name.statsp,O_RDONLY);
+            char answer[50] = {0};
+            while(read(stats2,&answer,50) > 0){
+                char c = '\n';
+                write(1, answer, strlen(answer));
+                write(1,&c,1);
+            }
+            close(stats);
+            unlink(name.statsp);
+            return 0;
+        }
+        else{
+            return 0;
         }
     }
     else if(strcmp("status",argv[1]) == 0){

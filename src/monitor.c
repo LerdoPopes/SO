@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <stdlib.h>
-#include "/home/wally/SO_aulas/SO/include/monitor.h"
+#include "../include/monitor.h"
 
 void remove_proc(processo* arr_procs, int pid, int size, int fd, int args){
     struct timeval tv;
@@ -61,8 +61,6 @@ int main(int args, char* argv[]){
         printf("Fifo already exists\n");
     };
     mkfifo("./obj/status", 0640);
-    mkfifo("./obj/status_time", 0640);
-    mkfifo("./obj/status_command", 0640);
     int fifo = open("./obj/fifo", O_RDWR);
     int size = 20;
     processo* arr_procs = malloc(sizeof(processo)*20);
@@ -89,7 +87,7 @@ int main(int args, char* argv[]){
                 if (pid == 0){
                     long time = 0;
                     int x = 0;
-                    int fifo_status = open("./obj/status_time",O_RDONLY);
+                    int fifo_status = open(name.statsp,O_RDONLY);
                     while(read(fifo_status,&x,sizeof(int)) > 0){
                         sprintf(str,"%s/%d",argv[1],x);
                         int file = open(str,O_RDONLY);
@@ -97,7 +95,7 @@ int main(int args, char* argv[]){
                         time += pname.time;
                     }
                     close(fifo_status);
-                    int fifo_status2 = open("./obj/status_time",O_WRONLY);
+                    int fifo_status2 = open(name.statsp,O_WRONLY);
                     write(fifo_status2,&time,sizeof(long));
                     close(fifo_status2);
                     _exit(0);
@@ -109,7 +107,7 @@ int main(int args, char* argv[]){
                 if (pid == 0){
                     int times = 0;
                     long size = name.tv.tv_sec;
-                    int fifo_status = open("./obj/status_command",O_RDONLY);
+                    int fifo_status = open(name.statsp,O_RDONLY);
                     int n[size];
                     int i = 0;
                     while(read(fifo_status,&(n[i]),sizeof(int)) > 0){
@@ -123,8 +121,51 @@ int main(int args, char* argv[]){
                         times += parse_n_count(namae.programa,name.programa);
                     }
                     close(fifo_status);
-                    int fifo_status2 = open("./obj/status_command",O_WRONLY);
+                    int fifo_status2 = open(name.statsp,O_WRONLY);
                     write(fifo_status2,&times,sizeof(int));
+                    close(fifo_status2);
+                    _exit(0);
+                }
+                wait(NULL);
+            }
+            else if(name.processo == -3){
+                status pname;
+                int pid = fork();
+                if (pid == 0){
+                    int x = 0;
+                    int size = 30;
+                    char** names = malloc(sizeof(char*) * size); 
+                    for(int i = 0; i < size; i++){
+                        names[i] = malloc(50);
+                        names[i][0] = 0;
+                    }
+                    int fifo_status = open(name.statsp,O_RDONLY);
+                    int iter = 0;
+                    while(read(fifo_status,&x,sizeof(int)) > 0){
+                        sprintf(str,"%s/%d",argv[1],x);
+                        int file = open(str,O_RDONLY);
+                        read(file,&pname,sizeof(status));
+                        char* nome = pname.programa;
+                        char* tok;
+                        while((tok = strtok_r(nome, " |", &nome)) != NULL){
+                            strcpy(names[iter],tok);
+                            iter++;
+                        }
+                    }
+                    close(fifo_status);
+                    for(int i = 0;i < size;i++){
+                        for(int j = i+1;j < size;j++){
+                            if(names[i][0] && names[j][0] &&(strcmp(names[i],names[j])== 0)){
+                                names[j][0] = 0;
+                            }
+                        }
+                    }
+                    int fifo_status2 = open(name.statsp,O_WRONLY);
+                    for(int i = 0; i < size;i++){
+                        if(names[i][0]){
+                            write(fifo_status2,names[i],50);
+                        }
+                    }
                     close(fifo_status2);
                     _exit(0);
                 }
@@ -139,8 +180,16 @@ int main(int args, char* argv[]){
                 remove_proc(arr_procs, name.processo,size,fd,args);
             }
             else{
-                int i;
-                for (i = 0; arr_procs[i].processo != 0 && i < size;i++);
+                int i = 0;
+                for (; arr_procs[i].processo != 0;i++){
+                    if(i == size){
+                        arr_procs = realloc(arr_procs, sizeof(processo)*(size*=2));
+                        for(int j = i; j < size;j++){
+                            arr_procs[i].processo = 0;
+                        }
+
+                    }
+                }
                 arr_procs[i] = name;
             }
         }
